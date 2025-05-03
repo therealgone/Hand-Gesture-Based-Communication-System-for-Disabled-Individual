@@ -42,10 +42,18 @@ ENV/
 *.png
 !UI.png
 !arch.png
+!UI.jpg
+!arch.jpg
 
 # Logs
 *.log
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Documentation images (keep these)
+UI.png
+arch.png
+UI.jpg
+arch.jpg 
