@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign Sentence Builder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f2f2f2;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .block {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      max-width: 800px;
+      margin: 20px auto;
+    }
+    .btn {
+      padding: 10px 20px;
+      background: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #2980b9;
+    }
+    input, textarea {
+      padding: 8px;
+      width: 80%;
+      margin-bottom: 10px;
+    }
+    .preset-form {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .preset-form label {
+      width: 100px;
+      font-weight: bold;
+    }
+    .logs-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    .logs-table th, .logs-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .logs-table th {
+      background-color: #f2f2f2;
+    }
+    .logs-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 10px;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #e0e0e0;
+      margin-right: 5px;
+      border-radius: 5px 5px 0 0;
+    }
+    .tab.active {
+      background: #3498db;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    #word {
+      font-size: 24px;
+      font-weight: bold;
+      color: #3498db;
+    }
+    #sentence {
+      font-size: 18px;
+      line-height: 1.4;
+    }
+    #response {
+      font-size: 18px;
+      line-height: 1.4;
+      color: #2c3e50;
+    }
+    .preset-info {
+      background-color: #f0f8ff;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Sign-to-Sentence Web Controller</h1>
+
+  <div class="block">
+    <h3>📌 Current Detected Word:</h3>
+    <p id="word">{{ word }}</p>
+    <button class="btn" onclick="addWord()">Add Word</button>
+    <button class="btn" onclick="resetSentence()">Reset Sentence</button>
+    <button class="btn" onclick="sendToGemini()">Send to Gemini</button>
+  </div>
+
+  <div class="block">
+    <h3>🧾 Current Sentence:</h3>
+    <p id="sentence">{{ sentence }}</p>
+  </div>
+
+  <div class="block">
+    <h3>💬 Gemini Response:</h3>
+    <p id="response">{{ reply }}</p>
+  </div>
+
+  <div class="block">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('presets-tab')">Presets</div>
+      <div class="tab" onclick="switchTab('logs-tab')">Logs</div>
+    </div>
+
+    <div id="presets-tab" class="tab-content active">
+      <h3>⚙️ Configure Presets:</h3>
+      <div class="preset-info">
+        <p><strong>How presets work:</strong> When a preset gesture is detected, the mapped custom text here will be used instead.</p>
+      </div>
+      <div id="presets-container">
+        <!-- Will be populated by JavaScript -->
+      </div>
+      <button class="btn" onclick="savePresets()">Save Presets</button>
+    </div>
+
+    <div id="logs-tab" class="tab-content">
+      <h3>📊 Conversation Logs:</h3>
+      <button class="btn" onclick="refreshLogs()">Refresh Logs</button>
+      <button class="btn" onclick="downloadLogs()">Download Logs</button>
+      <div id="logs-container">
+        <table class="logs-table" id="logs-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Sentence</th>
+              <th>Response</th>
+            </tr>
+          </thead>
+          <tbody id="logs-body">
+            <!-- Will be populated by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+      
+      if (tabId === 'logs-tab') refreshLogs();
+      else if (tabId === 'presets-tab') loadPresets();
+    }
+
+    function loadPresets() {
+      fetch('/presets')
+        .then(res => res.json())
+        .then(presets => {
+          const container = document.getElementById('presets-container');
+          container.innerHTML = '';
+          for (const [key, value] of Object.entries(presets)) {
+            const div = document.createElement('div');
+            div.className = 'preset-form';
+            div.innerHTML = `
+              <label for="${key}">${key}:</label>
+              <input type="text" id="${key}" value="${value}" />
+            `;
+            container.appendChild(div);
+          }
+        });
+    }
+
+    function savePresets() {
+      const inputs = document.querySelectorAll('#presets-container input');
+      inputs.forEach(input => {
+        fetch('/update_preset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: input.id, value: input.value })
+        });
+      });
+      alert('Presets saved!');
+    }
+
+    function refreshLogs() {
+      fetch('/logs')
+        .then(res => res.json())
+        .then(logs => {
+          const tbody = document.getElementById('logs-body');
+          tbody.innerHTML = '';
+          logs.reverse().forEach(log => {
+            const row = document.createElement('tr');
+            const ts = new Date(log.timestamp).toLocaleString();
+            row.innerHTML = `<td>${ts}</td><td>${log.sentence}</td><td>${log.response}</td>`;
+            tbody.appendChild(row);
+          });
+        });
+    }
+
+    function downloadLogs() {
+      window.location.href = '/logs_file';
+    }
+
+    function addWord() {
+      const word = document.getElementById('word').innerText;
+      if (!word.trim()) return;
+      fetch('/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('sentence').innerText = data.sentence.join(" ");
+      });
+    }
+
+    function resetSentence() {
+      fetch('/reset', { method: 'POST' }).then(() => {
+        document.getElementById('sentence').innerText = "";
+        document.getElementById('response').innerText = "";
+      });
+    }
+
+    function sendToGemini() {
+      const sentence = document.getElementById('sentence').innerText;
+      if (!sentence.trim()) return alert("Add words first.");
+      document.getElementById('response').innerText = "Generating...";
+      fetch('/gemini', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('response').innerText = data.response;
+          refreshLogs();
+        });
+    }
+
+    function updateLive() {
+      fetch('/latest')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('word').innerText = data.word || "";
+          document.getElementById('sentence').innerText = data.sentence.join(" ");
+        });
+    }
+
+    setInterval(updateLive, 500);
+    loadPresets();
+  </script>
+</body>
+</html>
+w
