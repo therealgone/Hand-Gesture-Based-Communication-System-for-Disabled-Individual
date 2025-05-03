@@ -4,7 +4,7 @@ A real-time sign language detection system that uses computer vision and machine
 
 ## Project Overview
 
-![Architecture Diagram](arch.png)
+![Architecture Diagram](arch.jpg)
 
 ## Features
 
