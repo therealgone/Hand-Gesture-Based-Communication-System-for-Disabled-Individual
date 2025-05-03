@@ -17,7 +17,7 @@ A real-time sign language detection system that uses computer vision and machine
 
 ## User Interface
 
-![User Interface](UI.png)
+![User Interface](UI.jpg)
 
 ## Project Structure
 
